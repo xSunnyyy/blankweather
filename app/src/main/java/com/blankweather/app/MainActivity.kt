@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.blankweather.app.ui.WeatherScreen
 import com.blankweather.app.ui.WeatherViewModel
@@ -14,10 +16,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            BlankWeatherTheme {
-                val vm: WeatherViewModel = viewModel(
-                    factory = WeatherViewModel.factory(applicationContext)
-                )
+            val vm: WeatherViewModel = viewModel(
+                factory = WeatherViewModel.factory(applicationContext)
+            )
+            val settings by vm.settings.collectAsState()
+            BlankWeatherTheme(themeMode = settings.themeMode) {
                 WeatherScreen(viewModel = vm)
             }
         }

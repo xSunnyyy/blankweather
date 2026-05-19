@@ -19,7 +19,11 @@ class WeatherApi {
         }
     }
 
-    suspend fun getForecast(latitude: Double, longitude: Double): ForecastResponse {
+    suspend fun getForecast(
+        latitude: Double,
+        longitude: Double,
+        unit: TempUnit,
+    ): ForecastResponse {
         return client.get("https://api.open-meteo.com/v1/forecast") {
             parameter("latitude", latitude)
             parameter("longitude", longitude)
@@ -32,7 +36,7 @@ class WeatherApi {
                 "daily",
                 "weather_code,temperature_2m_max,temperature_2m_min"
             )
-            parameter("temperature_unit", "celsius")
+            parameter("temperature_unit", unit.apiValue)
             parameter("timezone", "auto")
             parameter("forecast_days", 8)
         }.body()

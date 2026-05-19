@@ -6,6 +6,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.blankweather.app.data.AppSettings
+import com.blankweather.app.data.SettingsStore
+import com.blankweather.app.data.TempUnit
+import com.blankweather.app.data.ThemeMode
 import com.blankweather.app.data.WeatherRepository
 import com.blankweather.app.data.WeatherSnapshot
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +27,7 @@ sealed interface WeatherUiState {
 
 class WeatherViewModel(
     private val repo: WeatherRepository,
+    private val settingsStore: SettingsStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<WeatherUiState>(WeatherUiState.Idle)
@@ -31,12 +36,10 @@ class WeatherViewModel(
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
 
+    val settings: StateFlow<AppSettings> = settingsStore.state
+
     fun onPermissionResolved(granted: Boolean) {
-        if (granted) {
-            refresh()
-        } else {
-            _state.value = WeatherUiState.NeedsPermission
-        }
+        if (granted) refresh() else _state.value = WeatherUiState.NeedsPermission
     }
 
     fun ensurePermissionThenLoad() {
@@ -53,7 +56,7 @@ class WeatherViewModel(
         _refreshing.update { true }
         viewModelScope.launch {
             try {
-                val snapshot = repo.load()
+                val snapshot = repo.load(settingsStore.state.value.tempUnit)
                 _state.value = WeatherUiState.Loaded(snapshot)
             } catch (t: Throwable) {
                 _state.value = WeatherUiState.Error(t.message ?: "Something went wrong.")
@@ -63,10 +66,24 @@ class WeatherViewModel(
         }
     }
 
+    fun setThemeMode(mode: ThemeMode) {
+        settingsStore.setTheme(mode)
+    }
+
+    fun setUnit(unit: TempUnit) {
+        if (settingsStore.state.value.tempUnit == unit) return
+        settingsStore.setUnit(unit)
+        refresh()
+    }
+
     companion object {
         fun factory(context: Context): ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                WeatherViewModel(WeatherRepository(context.applicationContext))
+                val app = context.applicationContext
+                WeatherViewModel(
+                    repo = WeatherRepository(app),
+                    settingsStore = SettingsStore(app),
+                )
             }
         }
     }

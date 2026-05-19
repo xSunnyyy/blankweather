@@ -1,6 +1,7 @@
 package com.blankweather.app.ui
 
 import android.Manifest
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,26 +20,39 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.blankweather.app.data.AppSettings
 import com.blankweather.app.data.ForecastResponse
+import com.blankweather.app.data.TempUnit
+import com.blankweather.app.data.ThemeMode
 import com.blankweather.app.data.WeatherCode
 import com.blankweather.app.data.WeatherSnapshot
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
@@ -65,6 +79,9 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
 
     val state by viewModel.state.collectAsState()
     val refreshing by viewModel.refreshing.collectAsState()
+    val settings by viewModel.settings.collectAsState()
+
+    var showSettings by remember { mutableStateOf(false) }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { inner ->
         PullToRefreshBox(
@@ -83,14 +100,29 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                     message = s.message,
                     onRetry = { viewModel.refresh() }
                 )
-                is WeatherUiState.Loaded -> WeatherContent(s.snapshot)
+                is WeatherUiState.Loaded -> WeatherContent(
+                    snapshot = s.snapshot,
+                    onOpenSettings = { showSettings = true },
+                )
             }
         }
+    }
+
+    if (showSettings) {
+        SettingsSheet(
+            settings = settings,
+            onDismiss = { showSettings = false },
+            onThemeChange = viewModel::setThemeMode,
+            onUnitChange = viewModel::setUnit,
+        )
     }
 }
 
 @Composable
-private fun WeatherContent(snapshot: WeatherSnapshot) {
+private fun WeatherContent(
+    snapshot: WeatherSnapshot,
+    onOpenSettings: () -> Unit,
+) {
     val forecast = snapshot.forecast
     val now = forecast.current
     val tempInt = now.temperature.roundToInt()
@@ -138,15 +170,23 @@ private fun WeatherContent(snapshot: WeatherSnapshot) {
 
         Spacer(Modifier.height(8.dp))
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(4.dp))
 
-        Text(
-            text = "…",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onOpenSettings)
+                .padding(vertical = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "…",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+        }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -220,7 +260,7 @@ private fun HourlyRow(forecast: ForecastResponse) {
 private fun DailyList(forecast: ForecastResponse) {
     val days = forecast.daily
     val count = minOf(7, days.time.size)
-    for (i in 1 until count) {
+    for (i in 0 until count) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -228,7 +268,7 @@ private fun DailyList(forecast: ForecastResponse) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = formatDay(days.time[i]),
+                text = if (i == 0) "Today" else formatDay(days.time[i]),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f),
@@ -246,6 +286,106 @@ private fun DailyList(forecast: ForecastResponse) {
             )
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsSheet(
+    settings: AppSettings,
+    onDismiss: () -> Unit,
+    onThemeChange: (ThemeMode) -> Unit,
+    onUnitChange: (TempUnit) -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.background,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp, vertical = 8.dp),
+        ) {
+            Text(
+                text = "SETTINGS",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 2.sp,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
+                textAlign = TextAlign.Center,
+            )
+
+            SettingRow(label = "Theme") {
+                val options = ThemeMode.entries
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    options.forEachIndexed { idx, mode ->
+                        SegmentedButton(
+                            selected = settings.themeMode == mode,
+                            onClick = { onThemeChange(mode) },
+                            shape = SegmentedButtonDefaults.itemShape(idx, options.size),
+                        ) { Text(mode.label()) }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            SettingRow(label = "Units") {
+                val options = TempUnit.entries
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    options.forEachIndexed { idx, unit ->
+                        SegmentedButton(
+                            selected = settings.tempUnit == unit,
+                            onClick = { onUnitChange(unit) },
+                            shape = SegmentedButtonDefaults.itemShape(idx, options.size),
+                        ) { Text("°${unit.symbol}") }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(28.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+                    }
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Done",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun SettingRow(label: String, content: @Composable () -> Unit) {
+    Column {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        content()
+    }
+}
+
+private fun ThemeMode.label(): String = when (this) {
+    ThemeMode.SYSTEM -> "System"
+    ThemeMode.LIGHT -> "Light"
+    ThemeMode.DARK -> "Dark"
 }
 
 @Composable
@@ -324,7 +464,9 @@ private data class HourItem(val hourLabel: String, val code: Int, val probabilit
 
 private fun currentHourIndex(forecast: ForecastResponse): Int {
     val nowTime = forecast.current.time
-    val matchByExact = forecast.hourly.time.indexOf(nowTime.substring(0, minOf(13, nowTime.length)) + ":00")
+    val matchByExact = forecast.hourly.time.indexOf(
+        nowTime.substring(0, minOf(13, nowTime.length)) + ":00"
+    )
     if (matchByExact >= 0) return matchByExact
     val nowDate = LocalDateTime.parse(nowTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
     val truncated = nowDate.withMinute(0).withSecond(0).withNano(0)
