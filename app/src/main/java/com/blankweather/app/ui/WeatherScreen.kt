@@ -142,6 +142,8 @@ private fun WeatherContent(
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 2.sp,
             color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
         )
 
         Spacer(Modifier.height(36.dp))
@@ -220,12 +222,12 @@ private fun HourlyRow(forecast: ForecastResponse) {
             )
         } else null
     }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
+    Row(modifier = Modifier.fillMaxWidth()) {
         items.forEach { item ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 Text(
                     text = item.hourLabel,
                     style = MaterialTheme.typography.titleMedium,
@@ -273,16 +275,22 @@ private fun DailyList(forecast: ForecastResponse) {
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f),
             )
-            WeatherIcon(
-                kind = WeatherCode.kind(days.weatherCode[i]),
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.size(28.dp),
-            )
-            Spacer(Modifier.weight(1f))
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                WeatherIcon(
+                    kind = WeatherCode.kind(days.weatherCode[i]),
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
             Text(
                 text = "${days.temperatureMin[i].roundToInt()}° / ${days.temperatureMax[i].roundToInt()}°",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.End,
+                modifier = Modifier.weight(1f),
             )
         }
     }
