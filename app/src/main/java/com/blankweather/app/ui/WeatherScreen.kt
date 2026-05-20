@@ -40,9 +40,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.blankweather.app.data.AppSettings
@@ -150,27 +152,23 @@ private fun WeatherContent(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Spacer(Modifier.height(36.dp))
-        OpticallyCenteredTemperature(
-            digits = displayTemp(now.temperatureC, unit).toString(),
-            fontSize = 112.sp,
+        Spacer(Modifier.height(32.dp))
+        BigTemperature(value = displayTemp(now.temperatureC, unit))
+
+        Text(
+            text = now.description,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
         )
 
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(6.dp))
         Text(
             text = "REAL FEEL ${displayTemp(now.feelsLikeC, unit)}°",
             style = MaterialTheme.typography.bodyMedium,
             letterSpacing = 1.5.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = now.description,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -479,37 +477,28 @@ private fun CenteredHint(text: String) {
 }
 
 /**
- * Renders a big temperature like "70°" with the digits sitting at the visual
- * center of the row instead of the geometric center of the entire string.
- * Achieved by painting an invisible degree mark on the left that balances the
- * visible one on the right, so [Arrangement.Center] places the digits in the
- * middle of the screen.
+ * Renders the headline temperature with the digits sitting at the true visual
+ * center of the line. An invisible degree mark is prepended to the string so
+ * that TextAlign.Center balances the visible degree on the right — the layout
+ * engine treats the four glyphs (°, 7, 0, °) as a single run, and its center
+ * lands between the digits.
  */
 @Composable
-private fun OpticallyCenteredTemperature(digits: String, fontSize: TextUnit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = "°",
-            fontSize = fontSize,
-            fontWeight = FontWeight.Light,
-            color = Color.Transparent,
-        )
-        Text(
-            text = digits,
-            fontSize = fontSize,
-            fontWeight = FontWeight.Light,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Text(
-            text = "°",
-            fontSize = fontSize,
-            fontWeight = FontWeight.Light,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
+private fun BigTemperature(value: Int) {
+    val text = buildAnnotatedString {
+        withStyle(style = SpanStyle(color = Color.Transparent)) {
+            append("°")
+        }
+        append("$value°")
     }
+    Text(
+        text = text,
+        fontSize = 96.sp,
+        fontWeight = FontWeight.Light,
+        color = MaterialTheme.colorScheme.onBackground,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 private fun displayTemp(celsius: Double, unit: TempUnit): Int {
