@@ -76,13 +76,19 @@ class NwsApi {
             "$BASE/stations/$stationId/observations/latest"
         ).body()
         val temp = obs.properties.temperature.value
-        if (temp == null) null else CurrentWeather(
-            temperatureC = temp,
-            time = obs.properties.timestamp,
-            kind = NwsIcon.kindFromIconUrl(obs.properties.icon),
-            description = obs.properties.textDescription
-                ?.takeIf { it.isNotBlank() } ?: "—",
-        )
+        if (temp == null) null else {
+            val feelsLike = obs.properties.heatIndex.value
+                ?: obs.properties.windChill.value
+                ?: temp
+            CurrentWeather(
+                temperatureC = temp,
+                feelsLikeC = feelsLike,
+                time = obs.properties.timestamp,
+                kind = NwsIcon.kindFromIconUrl(obs.properties.icon),
+                description = obs.properties.textDescription
+                    ?.takeIf { it.isNotBlank() } ?: "—",
+            )
+        }
     } catch (_: Throwable) {
         null
     }
@@ -90,8 +96,10 @@ class NwsApi {
     private fun deriveCurrentFromHourly(forecast: HourlyForecast): CurrentWeather {
         val first = forecast.properties.periods.firstOrNull()
             ?: error("NWS returned no hourly periods")
+        val tempC = first.temperature.toCelsius(first.temperatureUnit)
         return CurrentWeather(
-            temperatureC = first.temperature.toCelsius(first.temperatureUnit),
+            temperatureC = tempC,
+            feelsLikeC = tempC,
             time = first.startTime,
             kind = NwsIcon.kindFromIconUrl(first.icon),
             description = first.shortForecast ?: "—",
@@ -237,6 +245,8 @@ private data class ObservationResponse(val properties: ObservationProperties)
 private data class ObservationProperties(
     val timestamp: String,
     val temperature: NullableDouble,
+    val heatIndex: NullableDouble = NullableDouble(),
+    val windChill: NullableDouble = NullableDouble(),
     val textDescription: String? = null,
     val icon: String? = null,
 )

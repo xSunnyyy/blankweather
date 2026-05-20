@@ -14,6 +14,7 @@ data class Forecast(
 
 data class CurrentWeather(
     val temperatureC: Double,
+    val feelsLikeC: Double,
     val time: String,
     val kind: WeatherKind,
     val description: String,

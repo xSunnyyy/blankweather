@@ -156,6 +156,16 @@ private fun WeatherContent(
             fontSize = 112.sp,
         )
 
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = "REAL FEEL ${displayTemp(now.feelsLikeC, unit)}°",
+            style = MaterialTheme.typography.bodyMedium,
+            letterSpacing = 1.5.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
         Spacer(Modifier.height(8.dp))
         Text(
             text = now.description,
