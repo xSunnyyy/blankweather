@@ -2,8 +2,11 @@
 
 A minimalist Android weather app inspired by the reference design — clean
 typography, line icons, light & dark theme, pull-to-refresh, location
-permissions, and the free [Open-Meteo](https://open-meteo.com/) API for
-forecasts.
+permissions, and the free US National Weather Service
+([api.weather.gov](https://www.weather.gov/documentation/services-web-api))
+as the data source. Current temperature is pulled from the nearest
+observation station for accuracy; the forecast comes from the local
+forecast office grid.
 
 ## Download the APK
 
@@ -27,7 +30,8 @@ adb install BlankWeather.apk
 ```
 
 The APK is debug-signed (so signature won't match an existing Play
-install), and minSdk is 26 (Android 8.0+).
+install), and minSdk is 26 (Android 8.0+). NWS only covers US
+territory — the app shows an error outside that.
 
 ## Features
 

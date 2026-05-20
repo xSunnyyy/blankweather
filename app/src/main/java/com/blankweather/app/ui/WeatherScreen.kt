@@ -44,16 +44,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.blankweather.app.data.AppSettings
-import com.blankweather.app.data.ForecastResponse
+import com.blankweather.app.data.Forecast
 import com.blankweather.app.data.TempUnit
 import com.blankweather.app.data.ThemeMode
-import com.blankweather.app.data.WeatherCode
 import com.blankweather.app.data.WeatherSnapshot
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import kotlinx.coroutines.launch
-import java.time.LocalDateTime
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
@@ -124,8 +126,8 @@ private fun WeatherContent(
     onOpenSettings: () -> Unit,
 ) {
     val forecast = snapshot.forecast
+    val unit = snapshot.unit
     val now = forecast.current
-    val tempInt = now.temperature.roundToInt()
     val cityLabel = (snapshot.city ?: "Current Location").uppercase()
 
     Column(
@@ -148,7 +150,7 @@ private fun WeatherContent(
 
         Spacer(Modifier.height(36.dp))
         Text(
-            text = "$tempInt°",
+            text = "${displayTemp(now.temperatureC, unit)}°",
             fontSize = 112.sp,
             fontWeight = FontWeight.Light,
             color = MaterialTheme.colorScheme.onBackground,
@@ -156,7 +158,7 @@ private fun WeatherContent(
 
         Spacer(Modifier.height(8.dp))
         Text(
-            text = WeatherCode.describe(now.weatherCode),
+            text = now.description,
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground,
         )
@@ -168,7 +170,7 @@ private fun WeatherContent(
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(Modifier.height(8.dp))
 
-        DailyList(forecast)
+        DailyList(forecast, unit)
 
         Spacer(Modifier.height(8.dp))
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -210,17 +212,11 @@ private fun WeatherContent(
 }
 
 @Composable
-private fun HourlyRow(forecast: ForecastResponse) {
-    val nowIndex = currentHourIndex(forecast)
+private fun HourlyRow(forecast: Forecast) {
+    val startIndex = currentHourIndex(forecast)
     val items = (0..5).mapNotNull { step ->
-        val i = nowIndex + step * 3
-        if (i in forecast.hourly.time.indices) {
-            HourItem(
-                hourLabel = formatHour(forecast.hourly.time[i]),
-                code = forecast.hourly.weatherCode[i],
-                probability = forecast.hourly.precipitationProbability.getOrNull(i) ?: 0,
-            )
-        } else null
+        val i = startIndex + step * 3
+        forecast.hourly.getOrNull(i)
     }
     Row(modifier = Modifier.fillMaxWidth()) {
         items.forEach { item ->
@@ -229,13 +225,13 @@ private fun HourlyRow(forecast: ForecastResponse) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = item.hourLabel,
+                    text = formatHour(item.time),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
                 Spacer(Modifier.height(8.dp))
                 WeatherIcon(
-                    kind = WeatherCode.kind(item.code),
+                    kind = item.kind,
                     color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.size(36.dp),
                 )
@@ -259,10 +255,11 @@ private fun HourlyRow(forecast: ForecastResponse) {
 }
 
 @Composable
-private fun DailyList(forecast: ForecastResponse) {
+private fun DailyList(forecast: Forecast, unit: TempUnit) {
     val days = forecast.daily
-    val count = minOf(7, days.time.size)
+    val count = minOf(7, days.size)
     for (i in 0 until count) {
+        val entry = days[i]
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -270,7 +267,7 @@ private fun DailyList(forecast: ForecastResponse) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = if (i == 0) "Today" else formatDay(days.time[i]),
+                text = if (i == 0) "Today" else formatDay(entry.date),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f),
@@ -280,13 +277,13 @@ private fun DailyList(forecast: ForecastResponse) {
                 contentAlignment = Alignment.Center,
             ) {
                 WeatherIcon(
-                    kind = WeatherCode.kind(days.weatherCode[i]),
+                    kind = entry.kind,
                     color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.size(28.dp),
                 )
             }
             Text(
-                text = "${days.temperatureMin[i].roundToInt()}° / ${days.temperatureMax[i].roundToInt()}°",
+                text = "${displayTemp(entry.minC, unit)}° / ${displayTemp(entry.maxC, unit)}°",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.End,
@@ -415,7 +412,7 @@ private fun PermissionPrompt(onRequest: () -> Unit) {
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                text = "Blank Weather uses your location to fetch the forecast from Open-Meteo. Nothing is stored or shared.",
+                text = "Blank Weather uses your location to fetch the forecast from the National Weather Service. Nothing is stored or shared.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -468,26 +465,25 @@ private fun CenteredHint(text: String) {
     }
 }
 
-private data class HourItem(val hourLabel: String, val code: Int, val probability: Int)
+private fun displayTemp(celsius: Double, unit: TempUnit): Int {
+    val converted = when (unit) {
+        TempUnit.CELSIUS -> celsius
+        TempUnit.FAHRENHEIT -> celsius * 9.0 / 5.0 + 32.0
+    }
+    return converted.roundToInt()
+}
 
-private fun currentHourIndex(forecast: ForecastResponse): Int {
-    val nowTime = forecast.current.time
-    val matchByExact = forecast.hourly.time.indexOf(
-        nowTime.substring(0, minOf(13, nowTime.length)) + ":00"
-    )
-    if (matchByExact >= 0) return matchByExact
-    val nowDate = LocalDateTime.parse(nowTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-    val truncated = nowDate.withMinute(0).withSecond(0).withNano(0)
-    val idx = forecast.hourly.time.indexOfFirst { entry ->
-        runCatching {
-            LocalDateTime.parse(entry, DateTimeFormatter.ISO_LOCAL_DATE_TIME) >= truncated
-        }.getOrDefault(false)
+private fun currentHourIndex(forecast: Forecast): Int {
+    if (forecast.hourly.isEmpty()) return 0
+    val now = OffsetDateTime.now()
+    val idx = forecast.hourly.indexOfFirst { entry ->
+        runCatching { OffsetDateTime.parse(entry.time) >= now }.getOrDefault(false)
     }
     return if (idx >= 0) idx else 0
 }
 
 private fun formatHour(iso: String): String {
-    val dt = LocalDateTime.parse(iso, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+    val dt = parseToLocal(iso)
     val hour = dt.hour
     val display = when {
         hour == 0 -> 12
@@ -498,11 +494,14 @@ private fun formatHour(iso: String): String {
 }
 
 private fun formatDay(iso: String): String {
-    val date = java.time.LocalDate.parse(iso)
+    val date = LocalDate.parse(iso)
     return date.format(DateTimeFormatter.ofPattern("EEE"))
 }
 
 private fun formatNow(iso: String): String {
-    val dt = LocalDateTime.parse(iso, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+    val dt = parseToLocal(iso)
     return dt.format(DateTimeFormatter.ofPattern("EEE, MMM d h:mm a"))
 }
+
+private fun parseToLocal(iso: String): ZonedDateTime =
+    OffsetDateTime.parse(iso).atZoneSameInstant(ZoneId.systemDefault())
