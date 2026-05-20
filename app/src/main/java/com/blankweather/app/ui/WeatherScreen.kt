@@ -39,8 +39,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.blankweather.app.data.AppSettings
@@ -149,13 +151,9 @@ private fun WeatherContent(
         )
 
         Spacer(Modifier.height(36.dp))
-        Text(
-            text = "${displayTemp(now.temperatureC, unit)}°",
+        OpticallyCenteredTemperature(
+            digits = displayTemp(now.temperatureC, unit).toString(),
             fontSize = 112.sp,
-            fontWeight = FontWeight.Light,
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
         )
 
         Spacer(Modifier.height(8.dp))
@@ -224,15 +222,24 @@ private fun HourlyRow(forecast: Forecast, unit: TempUnit) {
     }
     Row(modifier = Modifier.fillMaxWidth()) {
         items.forEach { item ->
+            val label = formatHour(item.time)
             Column(
                 modifier = Modifier.weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(
-                    text = formatHour(item.time),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = label.hour,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    Text(
+                        text = label.meridiem,
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 3.dp, start = 2.dp),
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
                 WeatherIcon(
                     kind = item.kind,
@@ -461,6 +468,40 @@ private fun CenteredHint(text: String) {
     }
 }
 
+/**
+ * Renders a big temperature like "70°" with the digits sitting at the visual
+ * center of the row instead of the geometric center of the entire string.
+ * Achieved by painting an invisible degree mark on the left that balances the
+ * visible one on the right, so [Arrangement.Center] places the digits in the
+ * middle of the screen.
+ */
+@Composable
+private fun OpticallyCenteredTemperature(digits: String, fontSize: TextUnit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = "°",
+            fontSize = fontSize,
+            fontWeight = FontWeight.Light,
+            color = Color.Transparent,
+        )
+        Text(
+            text = digits,
+            fontSize = fontSize,
+            fontWeight = FontWeight.Light,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Text(
+            text = "°",
+            fontSize = fontSize,
+            fontWeight = FontWeight.Light,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+    }
+}
+
 private fun displayTemp(celsius: Double, unit: TempUnit): Int {
     val converted = when (unit) {
         TempUnit.CELSIUS -> celsius
@@ -478,7 +519,9 @@ private fun currentHourIndex(forecast: Forecast): Int {
     return if (idx >= 0) idx else 0
 }
 
-private fun formatHour(iso: String): String {
+private data class HourLabel(val hour: String, val meridiem: String)
+
+private fun formatHour(iso: String): HourLabel {
     val dt = parseToLocal(iso)
     val hour = dt.hour
     val display = when {
@@ -486,7 +529,8 @@ private fun formatHour(iso: String): String {
         hour > 12 -> hour - 12
         else -> hour
     }
-    return display.toString()
+    val meridiem = if (hour < 12) "AM" else "PM"
+    return HourLabel(display.toString(), meridiem)
 }
 
 private fun formatDay(iso: String): String {
