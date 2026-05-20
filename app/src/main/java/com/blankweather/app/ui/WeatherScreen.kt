@@ -154,6 +154,8 @@ private fun WeatherContent(
             fontSize = 112.sp,
             fontWeight = FontWeight.Light,
             color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
         )
 
         Spacer(Modifier.height(8.dp))
@@ -161,10 +163,12 @@ private fun WeatherContent(
             text = now.description,
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
         )
 
         Spacer(Modifier.height(36.dp))
-        HourlyRow(forecast)
+        HourlyRow(forecast, unit)
 
         Spacer(Modifier.height(20.dp))
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -212,7 +216,7 @@ private fun WeatherContent(
 }
 
 @Composable
-private fun HourlyRow(forecast: Forecast) {
+private fun HourlyRow(forecast: Forecast, unit: TempUnit) {
     val startIndex = currentHourIndex(forecast)
     val items = (0..5).mapNotNull { step ->
         val i = startIndex + step * 3
@@ -236,19 +240,11 @@ private fun HourlyRow(forecast: Forecast) {
                     modifier = Modifier.size(36.dp),
                 )
                 Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        text = "${item.probability}",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    )
-                    Text(
-                        text = "%",
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.padding(bottom = 4.dp, start = 1.dp),
-                    )
-                }
+                Text(
+                    text = "${displayTemp(item.temperatureC, unit)}°",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
             }
         }
     }
@@ -283,7 +279,7 @@ private fun DailyList(forecast: Forecast, unit: TempUnit) {
                 )
             }
             Text(
-                text = "${displayTemp(entry.minC, unit)}° / ${displayTemp(entry.maxC, unit)}°",
+                text = "${displayTemp(entry.maxC, unit)}° / ${displayTemp(entry.minC, unit)}°",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.End,
